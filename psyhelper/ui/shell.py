@@ -25,17 +25,21 @@ def render():
         if st.session_state.demo_role == "Paziente":
             labels = (("patient_today","Oggi"),("patient_activities","Attività"),("patient_journey","Percorso"),("patient_private","Area privata"),("patient_bridge","Prepara la seduta"))
             for route, label in labels:
-                if st.button(label, key=f"nav-{route}", use_container_width=True, type="primary" if st.session_state.route == route else "secondary"):
-                    st.session_state.route = route
+                st.button(label, key=f"nav-{route}", use_container_width=True,
+                          type="primary" if st.session_state.route == route else "secondary",
+                          on_click=state.set_route, args=(st, route))
         else:
-            if st.button("Panoramica", use_container_width=True): state.dashboard(st)
+            st.button("Panoramica", key="nav-dashboard", use_container_width=True,
+                      type="primary" if st.session_state.route == "dashboard" else "secondary",
+                      on_click=state.dashboard, args=(st,))
             st.caption("I miei percorsi")
             if patient:
                 st.markdown(f"**{patient.name}**")
                 labels = (("oggi","Oggi"),("andamento","Andamento"),("homework","Homework"),("percorso","Percorso"),("prepara","Prepara seduta"))
                 for route, label in labels:
-                    if st.button(label, key=f"nav-{route}", use_container_width=True, type="primary" if st.session_state.route == route else "secondary"):
-                        st.session_state.route = route
+                    st.button(label, key=f"nav-{route}", use_container_width=True,
+                              type="primary" if st.session_state.route == route else "secondary",
+                              on_click=state.set_route, args=(st, route))
         st.write(""); st.write("")
         with st.expander("Impostazioni demo"):
             role = st.radio("Cambia vista demo", ("Professionista", "Paziente"),
