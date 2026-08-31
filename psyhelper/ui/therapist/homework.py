@@ -5,6 +5,7 @@ from psyhelper.demo.homework_catalog import HOMEWORK_CATALOG, homework_template
 from psyhelper.domain.models import HomeworkStatus
 from psyhelper.ui.actions import assign_homework
 from psyhelper.ui.components import homework_answer
+from psyhelper.ui.presentation import italian_date
 
 
 DESCRIPTIONS = {
@@ -38,7 +39,7 @@ def render(st, repo, model):
     labels = {HomeworkStatus.COMPLETED:"Completato",HomeworkStatus.PENDING:"Da completare",HomeworkStatus.EXPIRED:"Scaduto"}
     for assignment in reversed(model["assignments"]):
         cols = st.columns([3,1])
-        cols[0].markdown(f"**{assignment.template.title}**  \nAssegnato il {assignment.assigned_at:%d/%m/%Y} · scadenza {assignment.due_at:%d/%m/%Y}")
-        cols[1].write(labels[assignment.status])
+        cols[0].markdown(f"**{assignment.template.title}**  \n<span class='ph-meta'>Assegnato {italian_date(assignment.assigned_at)} · Scadenza {italian_date(assignment.due_at)}</span>", unsafe_allow_html=True)
+        cols[1].markdown(f'<span class="ph-badge ph-{assignment.status.value}">{labels[assignment.status]}</span>', unsafe_allow_html=True)
         if assignment.submission: homework_answer(st, assignment)
         st.divider()

@@ -6,7 +6,7 @@ from psyhelper.demo.scenarios import did
 from psyhelper.demo.seed import seed_demo_database
 from psyhelper.domain.models import BridgeStatus, HomeworkStatus
 from psyhelper.ui.actions import advance_bridge, assign_homework
-from psyhelper.ui.presentation import patient_read_model, patient_summary
+from psyhelper.ui.presentation import distinct_revisit_points, italian_date, metric_delta, patient_read_model, patient_summary, significant_events
 from psyhelper.ui import state
 
 
@@ -67,3 +67,32 @@ def test_therapist_model_never_contains_private_notes_and_matches_report(tmp_pat
     assert not private_ids & {n.id for n in model["notes"]}
     assert not private_ids & {n.id for n in model["report"].shared_notes}
     assert model["report"].homework_expired == sum(a.status == HomeworkStatus.EXPIRED for a in model["assignments"] if a.assigned_at >= DemoClock().now - timedelta(days=21))
+
+
+def test_italian_dates_do_not_depend_on_system_locale():
+    now = DemoClock().now
+    assert italian_date(now, style="short") == "31 ago"
+    assert italian_date(now, year=True) == "31 agosto 2026"
+
+
+def test_metric_delta_has_semantic_direction_and_complete_copy():
+    assert metric_delta(4.2, 5.0) == "↓ 0,8 in meno rispetto al periodo precedente"
+    assert metric_delta(5.8, 5.0) == "↑ 0,8 in più rispetto al periodo precedente"
+    assert metric_delta(5.0, 5.0) == "In linea con il periodo precedente"
+
+
+def test_pre_session_revisit_points_do_not_repeat_shared_notes(tmp_path):
+    repo = seed_demo_database(tmp_path / "demo.db")
+    model = patient_read_model(repo, did("martina", "patient", 0))
+    points = distinct_revisit_points(model["report"], [item.text for item in model["insights"][:4]])
+    shared = {note.text.casefold() for note in model["report"].shared_notes}
+    assert not shared & {point.removeprefix("Nota condivisa:").strip().casefold() for point in points}
+
+
+def test_bridge_is_available_with_significant_pre_session_context(tmp_path):
+    repo = seed_demo_database(tmp_path / "demo.db")
+    model = patient_read_model(repo, did("giulia", "patient", 0))
+    current = next(b for b in reversed(model["bridges"]) if b.status != BridgeStatus.ARCHIVED)
+    assert current.status == BridgeStatus.READY
+    assert current.items
+    assert 3 <= len(significant_events(model["events"], model["checkins"])) <= 5
