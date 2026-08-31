@@ -1,6 +1,6 @@
 from psyhelper.domain.models import BridgeStatus, EventKind
-from psyhelper.ui.components import insight, trend_chart
-from psyhelper.ui.presentation import italian_date, metric_delta
+from psyhelper.ui.components import insight, semantic_metric, trend_chart
+from psyhelper.ui.presentation import italian_date
 
 
 def render(st, model):
@@ -8,8 +8,8 @@ def render(st, model):
     st.caption("Se la seduta fosse tra poco, questi sono gli elementi più recenti da cui partire.")
     metrics, counts = model["metrics"], model["counts"]
     cols = st.columns(4)
-    cols[0].metric("Ansia recente", metrics["anxiety"], metric_delta(metrics["anxiety"], metrics["previous_anxiety"]), delta_color="off")
-    cols[1].metric("Stress recente", metrics["stress"], metric_delta(metrics["stress"], metrics["previous_stress"]), delta_color="off")
+    semantic_metric(cols[0], "Ansia recente", metrics["anxiety"], metrics["anxiety"], metrics["previous_anxiety"])
+    semantic_metric(cols[1], "Stress recente", metrics["stress"], metrics["stress"], metrics["previous_stress"])
     adherence = round(counts["completed"] / counts["assigned"] * 100) if counts["assigned"] else 0
     cols[2].metric("Homework", f"{adherence}%", f"{counts['completed']} di {counts['assigned']} completati")
     cols[3].metric("Ultima attività", italian_date(model["checkins"][-1].recorded_at, style="short"), "Check-in", delta_color="off")

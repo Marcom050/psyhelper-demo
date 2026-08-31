@@ -24,6 +24,9 @@ div[data-testid="stMetric"] { background:#fff; border:1px solid #e4ded7; border-
 .ph-answer:first-child { border-top:0; padding-top:0; }
 .ph-adherence { background:#fff; border:1px solid #e4ded7; border-radius:12px; padding:.9rem 1.1rem; display:flex; align-items:baseline; gap:1.25rem; flex-wrap:wrap; }
 .ph-adherence strong { color:#292724; font-size:1.35rem; }.ph-adherence span { color:#756f68; }
+.ph-semantic-metric { background:#fff; border:1px solid #e4ded7; border-radius:12px; padding:1rem; display:flex; flex-direction:column; gap:.18rem; }
+.ph-semantic-metric > span { color:#625d57; font-size:.9rem; }.ph-semantic-metric > strong { font-size:2rem; line-height:1.2; }
+.ph-semantic-metric small { font-weight:650; }.ph-delta-positive { color:#46705d; }.ph-delta-attention { color:#9a681f; }.ph-delta-neutral { color:#756f68; }
 div[data-testid="stExpander"] details summary { padding-top:.55rem; padding-bottom:.55rem; }
 @media (max-width: 760px) { .block-container{padding-top:1.2rem}.ph-patient{min-height:auto}.ph-row{grid-template-columns:6.5rem 1fr} }
 </style>

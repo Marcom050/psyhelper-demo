@@ -17,14 +17,39 @@ def italian_date(value: date | datetime, *, style: str = "long", year: bool = Fa
     return f"{value.day} {names[value.month - 1]}{suffix}"
 
 
-def metric_delta(value, previous) -> str:
+@dataclass(frozen=True)
+class MetricDelta:
+    text: str
+    tone: str
+
+
+def metric_delta_model(value, previous) -> MetricDelta:
     if value is None or previous is None:
-        return "Confronto non disponibile"
+        return MetricDelta("Confronto non disponibile", "neutral")
     delta = round(value - previous, 1)
     if abs(delta) < .1:
-        return "In linea con il periodo precedente"
-    direction, description = ("↓", "in meno") if delta < 0 else ("↑", "in più")
-    return f"{direction} {abs(delta):.1f} {description} rispetto al periodo precedente".replace(".", ",")
+        return MetricDelta("→ stabile", "neutral")
+    direction, tone = ("↓", "positive") if delta < 0 else ("↑", "attention")
+    text = f"{direction} {abs(delta):.1f} rispetto al periodo precedente".replace(".", ",")
+    return MetricDelta(text, tone)
+
+
+def metric_delta(value, previous) -> str:
+    """Backward-compatible textual form of the semantic metric delta."""
+    return metric_delta_model(value, previous).text
+
+
+def trend_dataset(checkins, limit=None):
+    """Build the numeric, chronological long-form dataset consumed by Altair."""
+    ordered = sorted(checkins, key=lambda check: check.recorded_at)
+    if limit is not None:
+        ordered = ordered[-limit:]
+    return [
+        {"date": check.recorded_at, "metric": metric, "value": float(value)}
+        for check in ordered
+        for metric, value in (("Ansia", check.anxiety), ("Stress", check.stress))
+        if value is not None
+    ]
 
 
 def significant_events(events, checkins=(), limit=5):

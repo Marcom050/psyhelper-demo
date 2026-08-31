@@ -5,8 +5,11 @@ from psyhelper.demo.homework_catalog import homework_template
 from psyhelper.demo.scenarios import did
 from psyhelper.demo.seed import seed_demo_database
 from psyhelper.domain.models import BridgeStatus, HomeworkStatus
+from psyhelper.repository import DemoRepository
 from psyhelper.ui.actions import advance_bridge, assign_homework
-from psyhelper.ui.presentation import distinct_revisit_points, italian_date, metric_delta, patient_read_model, patient_summary, significant_events
+from psyhelper.ui.presentation import (MetricDelta, distinct_revisit_points, italian_date,
+                                       metric_delta_model, patient_read_model, patient_summary,
+                                       significant_events, trend_dataset)
 from psyhelper.ui import state
 
 
@@ -47,6 +50,17 @@ def test_homework_assignment_is_persisted_and_read_model_refreshes(tmp_path):
     assert patient_read_model(repo, patient.id)["counts"]["pending"] >= 1
 
 
+def test_therapist_assignment_survives_reload_and_is_visible_to_patient(tmp_path):
+    path = tmp_path / "demo.db"; repo = seed_demo_database(path)
+    patient = repo.patient(did("giulia", "patient", 0)); now = DemoClock().now
+    created = assign_homework(repo, patient.id, homework_template("abc"), now, (now + timedelta(days=7)).date())
+    reloaded = DemoRepository(path)
+    therapist_assignment = next(a for a in patient_read_model(reloaded, patient.id)["assignments"] if a.id == created.id)
+    assert therapist_assignment.template.prompts == homework_template("abc").prompts
+    assert any(a.id == created.id for a in reloaded.assignments(patient.id) if a.status == HomeworkStatus.PENDING)
+    assert therapist_assignment.due_at.tzinfo == now.tzinfo
+
+
 def test_bridge_actions_persist_and_archiving_creates_independent_draft(tmp_path):
     repo = seed_demo_database(tmp_path / "demo.db")
     patient = repo.patient(did("giulia", "patient", 0)); now = DemoClock().now
@@ -76,9 +90,22 @@ def test_italian_dates_do_not_depend_on_system_locale():
 
 
 def test_metric_delta_has_semantic_direction_and_complete_copy():
-    assert metric_delta(4.2, 5.0) == "↓ 0,8 in meno rispetto al periodo precedente"
-    assert metric_delta(5.8, 5.0) == "↑ 0,8 in più rispetto al periodo precedente"
-    assert metric_delta(5.0, 5.0) == "In linea con il periodo precedente"
+    assert metric_delta_model(4.2, 5.0) == MetricDelta("↓ 0,8 rispetto al periodo precedente", "positive")
+    assert metric_delta_model(5.8, 5.0) == MetricDelta("↑ 0,8 rispetto al periodo precedente", "attention")
+    assert metric_delta_model(5.0, 5.0) == MetricDelta("→ stabile", "neutral")
+    assert metric_delta_model(None, 5.0) == MetricDelta("Confronto non disponibile", "neutral")
+
+
+def test_chart_dataset_contains_both_numeric_series_for_every_seed_patient(tmp_path):
+    repo = seed_demo_database(tmp_path / "demo.db")
+    expected = {"Giulia Bianchi": 20, "Luca Ferri": 18, "Martina Romano": 20, "Andrea Conti": 18}
+    for patient in repo.patients():
+        checks = repo.checkins(patient.id); data = trend_dataset(checks)
+        assert len(checks) == expected[patient.name]
+        assert len(data) == expected[patient.name] * 2
+        assert {row["metric"] for row in data} == {"Ansia", "Stress"}
+        assert all(isinstance(row["value"], float) for row in data)
+        assert [row["date"] for row in data] == sorted(row["date"] for row in data)
 
 
 def test_pre_session_revisit_points_do_not_repeat_shared_notes(tmp_path):
