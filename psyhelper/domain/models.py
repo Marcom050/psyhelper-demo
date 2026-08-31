@@ -34,6 +34,7 @@ class EventKind(StrEnum):
     SETBACK = "setback"
     STEP_FORWARD = "step_forward"
     RECURRING_TRIGGER = "recurring_trigger"
+    MAINTAINED_PROGRESS = "maintained_progress"
 
 
 @dataclass
@@ -61,10 +62,18 @@ class CheckIn:
     stress: int
     trigger: str = ""
     behavior: str = ""
+    mood: str | None = None
+    mood_intensity: int | None = None
+    automatic_thought: str | None = None
+    alternative_response: str | None = None
+    body_sensations: str | None = None
+    note_for_therapist: str | None = None
 
     def __post_init__(self):
         if not all(0 <= value <= 10 for value in (self.anxiety, self.stress)):
             raise ValueError("Anxiety and stress must be between 0 and 10")
+        if self.mood_intensity is not None and not 0 <= self.mood_intensity <= 10:
+            raise ValueError("Mood intensity must be between 0 and 10")
 
 
 @dataclass
@@ -154,12 +163,18 @@ class TimelineEvent:
     kind: EventKind
     text: str
     source_id: str | None = None
+    origin: str = "source"
+
+    def __post_init__(self):
+        if self.origin not in {"source", "derived"}:
+            raise ValueError("Timeline event origin must be source or derived")
 
 
 @dataclass
 class ProgressInsight:
     kind: str
     text: str
+    source_ids: tuple[str, ...] = ()
 
 
 @dataclass
@@ -169,8 +184,15 @@ class PreSessionReport:
     window_end: datetime
     homework_assigned: int
     homework_completed: int
+    homework_pending: int
+    homework_expired: int
+    homework_adherence: float | None
     recent_anxiety: float | None
     recent_stress: float | None
+    previous_anxiety: float | None
+    previous_stress: float | None
+    anxiety_change: float | None
+    stress_change: float | None
     recent_answers: list[dict[str, str]]
     shared_notes: list[PatientNote]
     points_to_revisit: list[str]
