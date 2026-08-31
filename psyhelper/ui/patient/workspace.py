@@ -5,6 +5,7 @@ from psyhelper.domain.models import BridgeStatus, GoalKind, GoalStatus, Homework
 from psyhelper.services.core import build_bridge_candidates
 from psyhelper.ui.actions import (complete_homework, create_patient_checkin, create_private_note,
                                   prepare_patient_bridge, set_note_sharing)
+from psyhelper.ui.components import trend_chart
 from psyhelper.ui.presentation import italian_date
 
 
@@ -143,8 +144,8 @@ def journey(st, repo, patient):
         status = "In corso" if goal.status == GoalStatus.ACTIVE else "Completato"
         st.markdown(f'<div class="ph-note"><span class="ph-eyebrow">{kind}</span><br><strong>{goal.title}</strong><br><span class="ph-meta">{status}</span></div>', unsafe_allow_html=True)
     st.subheader("Andamento")
-    checks = repo.checkins(patient.id); recent = checks[-12:]
-    st.line_chart({"Ansia": [c.anxiety for c in recent], "Stress": [c.stress for c in recent]}, height=220)
+    checks = repo.checkins(patient.id)
+    trend_chart(st, checks[-12:], compact=True)
     st.caption("Un modo semplice per rileggere i check-in nel tempo, senza giudicare i singoli giorni.")
     st.subheader("Nel tempo")
     observations = {"Luca": ["Hai partecipato alla cena fino al dolce.", "Hai proposto una pausa caffè.", "Hai scelto più volte di avvicinarti alle situazioni sociali."],

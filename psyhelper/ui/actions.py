@@ -1,13 +1,16 @@
-from datetime import datetime
+from datetime import date, datetime, time
 from uuid import uuid4
 
-from psyhelper.domain.models import (BridgeStatus, CheckIn, HomeworkAssignment, HomeworkStatus,
+from psyhelper.domain.models import (BridgeStatus, CheckIn, HomeworkAssignment, HomeworkStatus, HomeworkTemplate,
                                     PatientNote, SessionBridge, SessionBridgeItem)
 from psyhelper.services.core import revoke_note, share_note, submit_homework, transition_bridge
 
 
-def assign_homework(repo, patient_id, template, assigned_at: datetime, due_at: datetime):
-    assignment = HomeworkAssignment(str(uuid4()), patient_id, template, assigned_at, due_at, HomeworkStatus.PENDING)
+def assign_homework(repo, patient_id, template, assigned_at: datetime, due_at: date | datetime):
+    if isinstance(due_at, date) and not isinstance(due_at, datetime):
+        due_at = datetime.combine(due_at, time.max, tzinfo=assigned_at.tzinfo)
+    snapshot = HomeworkTemplate(template.id, template.title, tuple(template.prompts))
+    assignment = HomeworkAssignment(str(uuid4()), patient_id, snapshot, assigned_at, due_at, HomeworkStatus.PENDING)
     repo.save(assignment)
     return assignment
 

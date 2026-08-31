@@ -9,7 +9,7 @@ from psyhelper.ui.presentation import italian_date
 
 
 DESCRIPTIONS = {
-    "ABC":"Osservare il legame tra situazione, pensieri e conseguenze.", "thought_record":"Raccogliere pensieri ed emozioni in un episodio concreto.",
+    "abc":"Osservare il legame tra situazione, pensieri e conseguenze.", "thought_record":"Raccogliere pensieri ed emozioni in un episodio concreto.",
     "cognitive_restructuring":"Esplorare elementi a favore e prospettive alternative.", "graded_exposure":"Concordare un passo graduale e osservarne l'esito.",
     "avoidance_monitoring":"Notare l'impulso a evitare e la scelta compiuta.", "behavioral_activation":"Programmare un'attività significativa e verificarne l'esito.",
     "emotion_trigger":"Riconoscere emozioni, segnali e contesto.", "three_minute_breathing":"Creare una breve pausa di osservazione.",
@@ -31,7 +31,7 @@ def render(st, repo, model):
             due = st.date_input("Scadenza", value=(DemoClock().now + timedelta(days=7)).date(), min_value=DemoClock().now.date())
             if st.form_submit_button("Assegna", type="primary"):
                 now = DemoClock().now
-                assign_homework(repo, model["patient"].id, homework_template(slug), now, now.replace(year=due.year, month=due.month, day=due.day))
+                assign_homework(repo, model["patient"].id, homework_template(slug), now, due)
                 st.session_state.assign_open = False
                 st.success("Attività assegnata.")
                 st.rerun()
