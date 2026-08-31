@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
+import pandas as pd
+
 from psyhelper.demo.clock import DemoClock
 from psyhelper.domain.models import BridgeStatus, EventKind, HomeworkStatus, TimelineEvent
 from psyhelper.services.core import build_report, derive_progress, therapist_notes
@@ -44,12 +46,17 @@ def trend_dataset(checkins, limit=None):
     ordered = sorted(checkins, key=lambda check: check.recorded_at)
     if limit is not None:
         ordered = ordered[-limit:]
-    return [
+    rows = [
         {"date": check.recorded_at, "metric": metric, "value": float(value)}
         for check in ordered
         for metric, value in (("Ansia", check.anxiety), ("Stress", check.stress))
         if value is not None
     ]
+    frame = pd.DataFrame(rows, columns=["date", "metric", "value"])
+    frame["date"] = pd.to_datetime(frame["date"])
+    frame["metric"] = frame["metric"].astype("string")
+    frame["value"] = pd.to_numeric(frame["value"])
+    return frame.sort_values("date", kind="stable").reset_index(drop=True)
 
 
 def significant_events(events, checkins=(), limit=5):

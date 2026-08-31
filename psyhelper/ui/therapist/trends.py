@@ -5,7 +5,7 @@ from psyhelper.ui.presentation import italian_date, significant_events
 def render(st, model):
     st.subheader("Andamento nel tempo")
     st.caption("I punti corrispondono ai check-in registrati dal paziente.")
-    trend_chart(st, model["checkins"])
+    trend_chart(st, model["checkins"], patient_id=model["patient"].id, view="therapist-trends")
     st.subheader("Cosa è cambiato")
     for item in model["insights"]: insight(st, KIND_LABELS.get(item.kind, "Osservazione"), item.text)
     st.subheader("Timeline significativa")

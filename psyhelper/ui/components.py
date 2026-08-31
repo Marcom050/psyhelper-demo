@@ -29,24 +29,23 @@ def semantic_metric(st, label, value, current, previous):
     )
 
 
-def trend_chart(st, checks, compact=False):
+def trend_chart(st, checks, compact=False, *, patient_id=None, view="trend"):
     data = trend_dataset(checks, limit=20 if compact else None)
-    if not data:
+    if data.empty:
         st.info("Non ci sono ancora abbastanza check-in per mostrare l'andamento.")
         return None
-    base = alt.Chart(alt.Data(values=data))
-    encoding = dict(
+    chart = alt.Chart(data).mark_line(
+        point=alt.OverlayMarkDef(filled=True, size=52, stroke="white", strokeWidth=1),
+        strokeWidth=1.8,
+    ).encode(
         x=alt.X("date:T", title=None, axis=alt.Axis(format="%d/%m", grid=False, labelColor="#756f68", tickColor="#d8d1c9")),
         y=alt.Y("value:Q", title=None, scale=alt.Scale(domain=[0, 10]), axis=alt.Axis(grid=True, gridColor="#eee9e3", tickCount=6)),
         color=alt.Color("metric:N", scale=alt.Scale(domain=["Ansia", "Stress"], range=["#A35F46", "#65766B"]), legend=alt.Legend(title=None, orient="top")),
-    )
-    lines = base.mark_line(strokeWidth=1.8).encode(**encoding)
-    points = base.mark_point(filled=True, size=52, stroke="white", strokeWidth=1).encode(
-        **encoding,
         tooltip=[alt.Tooltip("date:T", title="Data", format="%d/%m/%Y"), alt.Tooltip("metric:N", title="Indicatore"), alt.Tooltip("value:Q", title="Valore")],
     )
-    chart = (lines + points).properties(height=260 if compact else 360).configure_view(stroke=None).configure(background="#ffffff")
-    st.altair_chart(chart, use_container_width=True, theme=None)
+    chart = chart.properties(height=260 if compact else 360).configure_view(stroke=None).configure(background="#ffffff")
+    stable_patient_id = patient_id or checks[0].patient_id
+    st.altair_chart(chart, use_container_width=True, theme=None, key=f"trend-{stable_patient_id}-{view}")
     return chart
 
 
