@@ -145,7 +145,7 @@ def journey(st, repo, patient):
         st.markdown(f'<div class="ph-note"><span class="ph-eyebrow">{kind}</span><br><strong>{goal.title}</strong><br><span class="ph-meta">{status}</span></div>', unsafe_allow_html=True)
     st.subheader("Andamento")
     checks = repo.checkins(patient.id)
-    trend_chart(st, checks[-12:], compact=True)
+    trend_chart(st, checks[-12:], compact=True, patient_id=patient.id, view="patient-journey")
     st.caption("Un modo semplice per rileggere i check-in nel tempo, senza giudicare i singoli giorni.")
     st.subheader("Nel tempo")
     observations = {"Luca": ["Hai partecipato alla cena fino al dolce.", "Hai proposto una pausa caffè.", "Hai scelto più volte di avvicinarti alle situazioni sociali."],

@@ -22,5 +22,5 @@ def render(st, model):
     current = next((b for b in reversed(model["bridges"]) if b.status != BridgeStatus.ARCHIVED), None)
     if current and current.status == BridgeStatus.READY and shown < 3: insight(st, "Bridge pronto", "Il paziente ha scelto gli elementi da portare nella prossima seduta.")
     st.subheader("Ultimi 60 giorni")
-    trend_chart(st, model["checkins"], compact=True)
+    trend_chart(st, model["checkins"], compact=True, patient_id=model["patient"].id, view="therapist-today")
     st.caption(f"Ansia media recente {metrics['anxiety']} · periodo precedente {metrics['previous_anxiety']} · Stress recente {metrics['stress']} · periodo precedente {metrics['previous_stress']}")

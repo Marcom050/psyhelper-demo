@@ -1,5 +1,6 @@
 from datetime import timedelta
 
+import pandas as pd
 from psyhelper.demo.clock import DemoClock
 from psyhelper.demo.homework_catalog import homework_template
 from psyhelper.demo.scenarios import did
@@ -102,10 +103,13 @@ def test_chart_dataset_contains_both_numeric_series_for_every_seed_patient(tmp_p
     for patient in repo.patients():
         checks = repo.checkins(patient.id); data = trend_dataset(checks)
         assert len(checks) == expected[patient.name]
+        assert isinstance(data, pd.DataFrame)
         assert len(data) == expected[patient.name] * 2
-        assert {row["metric"] for row in data} == {"Ansia", "Stress"}
-        assert all(isinstance(row["value"], float) for row in data)
-        assert [row["date"] for row in data] == sorted(row["date"] for row in data)
+        assert set(data["metric"]) == {"Ansia", "Stress"}
+        assert pd.api.types.is_datetime64_any_dtype(data["date"])
+        assert pd.api.types.is_string_dtype(data["metric"])
+        assert pd.api.types.is_numeric_dtype(data["value"])
+        assert data["date"].is_monotonic_increasing
 
 
 def test_pre_session_revisit_points_do_not_repeat_shared_notes(tmp_path):

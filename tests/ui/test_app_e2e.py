@@ -1,6 +1,8 @@
+import io
 import json
 from pathlib import Path
 
+import pyarrow.ipc as ipc
 from streamlit.testing.v1 import AppTest
 
 from psyhelper.demo.reset import reset_demo_database
@@ -19,10 +21,16 @@ def _assert_data_chart(app):
     charts = app.get("vega_lite_chart")
     assert len(charts) == 1
     spec = json.loads(charts[0].proto.spec)
-    assert charts[0].proto.data.data
-    encodings = [layer["encoding"] for layer in spec["layer"]]
-    assert all(encoding["color"]["field"] == "metric" for encoding in encodings)
-    assert all(encoding["y"]["field"] == "value" for encoding in encodings)
+    assert charts[0].proto.datasets
+    dataset = ipc.open_stream(io.BytesIO(charts[0].proto.datasets[0].data.data)).read_pandas()
+    assert not dataset.empty
+    assert "layer" not in spec
+    assert spec["mark"]["type"] == "line"
+    assert spec["mark"]["point"]
+    assert spec["encoding"]["x"]["field"] == "date"
+    assert spec["encoding"]["y"]["field"] == "value"
+    assert spec["encoding"]["color"]["field"] == "metric"
+    assert set(dataset["metric"]) == {"Ansia", "Stress"}
 
 
 def test_apptest_charts_and_therapist_to_patient_homework_flow():
