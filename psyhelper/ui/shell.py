@@ -17,7 +17,7 @@ def render():
     with st.sidebar:
         st.title("PsyHelper")
         st.caption("Area professionista")
-        if st.button("Panoramica", use_container_width=True): state.dashboard(st); st.rerun()
+        if st.button("Panoramica", use_container_width=True): state.dashboard(st)
         st.caption("I miei percorsi")
         patient = repo.patient(st.session_state.selected_patient_id) if st.session_state.selected_patient_id else None
         if patient:
@@ -25,7 +25,7 @@ def render():
             labels = (("oggi","Oggi"),("andamento","Andamento"),("homework","Homework"),("percorso","Percorso"),("prepara","Prepara seduta"))
             for route, label in labels:
                 if st.button(label, key=f"nav-{route}", use_container_width=True, type="primary" if st.session_state.route == route else "secondary"):
-                    st.session_state.route = route; st.rerun()
+                    st.session_state.route = route
         st.write(""); st.write("")
         with st.expander("Impostazioni demo"):
             if not st.session_state.get("confirm_reset"):

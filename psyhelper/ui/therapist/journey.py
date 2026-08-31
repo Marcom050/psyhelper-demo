@@ -1,5 +1,6 @@
 from psyhelper.domain.models import GoalKind, GoalStatus
 from psyhelper.ui.components import KIND_LABELS
+from psyhelper.ui.presentation import italian_date, significant_events
 
 
 def render(st, model):
@@ -14,4 +15,4 @@ def render(st, model):
     st.subheader("Progressi osservati")
     for item in model["insights"]: st.markdown(f"**{KIND_LABELS.get(item.kind, 'Osservazione')}**  \n{item.text}")
     st.subheader("Timeline significativa")
-    for event in reversed(model["events"]): st.markdown(f"**{event.occurred_at:%d %B} · {KIND_LABELS.get(event.kind.value, event.kind.value)}**  \n{event.text}")
+    for event in significant_events(model["events"], model["checkins"]): st.markdown(f"**{italian_date(event.occurred_at)} · {KIND_LABELS.get(event.kind.value, event.kind.value)}**  \n{event.text}")
