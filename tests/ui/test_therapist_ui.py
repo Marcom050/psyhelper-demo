@@ -23,9 +23,9 @@ def test_patient_selection_uses_only_small_route_state():
     st = _Streamlit(); st.session_state.clear()
     state.init_state(st)
     state.open_patient(st, "patient-1")
-    assert st.session_state == {"route": "oggi", "selected_patient_id": "patient-1"}
+    assert st.session_state == {"route": "oggi", "selected_patient_id": "patient-1", "demo_role": "Professionista"}
     state.dashboard(st)
-    assert st.session_state == {"route": "dashboard", "selected_patient_id": None}
+    assert st.session_state == {"route": "dashboard", "selected_patient_id": None, "demo_role": "Professionista"}
 
 
 def test_dashboard_summaries_are_derived_from_repository(tmp_path):

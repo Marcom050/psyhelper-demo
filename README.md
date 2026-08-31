@@ -1,6 +1,6 @@
 # PsyHelper Demo
 
-Demo professionale Streamlit con quattro percorsi terapeutici interamente fittizi. Mostra dati e cambiamenti descrittivi, senza formulare diagnosi.
+Demo Streamlit con aree professionista e paziente collegate sugli stessi quattro percorsi interamente fittizi. Mostra dati e cambiamenti descrittivi, senza formulare diagnosi o proporre terapia automatizzata.
 
 ## Architettura
 
@@ -8,7 +8,9 @@ Demo professionale Streamlit con quattro percorsi terapeutici interamente fittiz
 - `psyhelper/services`: regole pure per Homework, privacy, Bridge, obiettivi, progress e report.
 - `psyhelper/repository`: repository SQLite semplice, separato dalla UI.
 - `psyhelper/demo`: clock, scenari, seed e reset deterministici.
-- `psyhelper/ui`: shell Streamlit minimale.
+- `psyhelper/ui/therapist`: area professionista.
+- `psyhelper/ui/patient`: area personale, check-in, attività, percorso, note private e Session Bridge.
+- `psyhelper/ui/shell.py`: shell condivisa e cambio vista demo, senza autenticazione reale.
 
 ## Avvio
 
