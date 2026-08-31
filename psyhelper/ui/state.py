@@ -18,6 +18,10 @@ def dashboard(st):
     st.session_state.route = "dashboard"
 
 
+def set_route(st, route: str):
+    st.session_state.route = route
+
+
 def reset_ui(st):
     for key in tuple(st.session_state):
         st.session_state.pop(key, None)

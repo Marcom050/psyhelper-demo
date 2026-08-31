@@ -16,6 +16,11 @@ def _button(app, label):
     return next(button for button in app.button if button.label == label)
 
 
+def _assert_primary_navigation(app, label, route):
+    assert app.session_state.route == route
+    assert _button(app, label).proto.type == "primary"
+
+
 def _assert_data_chart(app):
     assert not app.exception
     charts = app.get("vega_lite_chart")
@@ -61,5 +66,27 @@ def test_apptest_charts_and_therapist_to_patient_homework_flow():
         assert any(created.template.title in item.value and "Scadenza" in item.value for item in app.markdown)
         _button(app, "Percorso").click().run()
         _assert_data_chart(app)
+    finally:
+        reset_demo_database(DEFAULT_DB)
+
+
+def test_sidebar_navigation_updates_route_and_selection_on_first_click():
+    reset_demo_database(DEFAULT_DB)
+    try:
+        app = AppTest.from_file(Path(__file__).parents[2] / "app.py", default_timeout=20).run()
+        _assert_primary_navigation(app, "Panoramica", "dashboard")
+        _button(app, "Apri percorso →").click().run()
+        _assert_primary_navigation(app, "Oggi", "oggi")
+
+        _button(app, "Andamento").click().run()
+        _assert_primary_navigation(app, "Andamento", "andamento")
+
+        _button(app, "Homework").click().run()
+        _assert_primary_navigation(app, "Homework", "homework")
+
+        app.radio[0].set_value("Paziente").run()
+        _assert_primary_navigation(app, "Oggi", "patient_today")
+        _button(app, "Attività").click().run()
+        _assert_primary_navigation(app, "Attività", "patient_activities")
     finally:
         reset_demo_database(DEFAULT_DB)
