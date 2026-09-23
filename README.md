@@ -32,3 +32,13 @@ python -m compileall app.py psyhelper
 ```
 
 Seed e reset ricostruiscono lo stesso stato usando la data ancora `2026-08-31` e UUID5 riproducibili.
+
+## Presentazione
+
+La [guida alla demo](docs/PREPARAZIONE_DEMO.md) descrive il percorso da mostrare,
+la differenza rispetto a PsyHelper Beta e le verifiche prima dell'incontro.
+
+Dopo un aggiornamento degli scenari, usa **Impostazioni demo → Ripristina dati demo**
+per caricare i nuovi esempi. Il ripristino richiede conferma ed elimina le modifiche
+apportate ai soli dati dimostrativi di questa installazione. Non viene eseguito
+automaticamente all'avvio.

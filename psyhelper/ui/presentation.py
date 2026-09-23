@@ -73,7 +73,7 @@ def significant_events(events, checkins=(), limit=5):
 
 
 def narrative_insights(insights, checkins, events, limit=4):
-    """Prefer source evidence over generic derived copy."""
+    """Keep quantitative observations intact; describe a step from its source."""
     by_id = {check.id: check for check in checkins}
     by_id.update({event.id: event for event in events})
     narratives = []
@@ -81,10 +81,39 @@ def narrative_insights(insights, checkins, events, limit=4):
         sources = [by_id[source_id] for source_id in item.source_ids if source_id in by_id]
         event = next((source for source in sources if hasattr(source, "text")), None)
         check = next((source for source in reversed(sources) if hasattr(source, "behavior") and source.behavior), None)
-        text = event.text if event else check.behavior if check else item.text
+        text = (event.text if event else check.behavior if check else item.text) if item.kind == "step_forward" else item.text
         if text and text not in [existing.text for existing in narratives]:
             narratives.append(type(item)(item.kind, text, item.source_ids))
     return narratives[:limit]
+
+
+def bridge_reference(item, model):
+    """Resolve a Bridge reference using only content visible in this read model."""
+    sources = {
+        "note": model["notes"], "checkin": model["checkins"],
+        "homework": model["assignments"], "progress_event": model["events"],
+    }
+    source = next((entry for entry in sources.get(item.source_type, ()) if entry.id == item.source_id), None)
+    if source is None:
+        return "Contenuto non più condiviso o non disponibile."
+    if item.source_type == "note":
+        return source.text if source.is_shared else "La nota non è più condivisa."
+    if item.source_type == "checkin":
+        values = [source.trigger, source.behavior, source.note_for_therapist]
+        return f"{italian_date(source.recorded_at)} · Ansia {source.anxiety}/10 · Stress {source.stress}/10\n\n" + "\n\n".join(value for value in values if value)
+    if item.source_type == "homework":
+        if not source.submission:
+            return "Questa attività non è ancora stata completata."
+        return "\n\n".join(f"{prompt.replace('_', ' ').capitalize()}: {answer}" for prompt, answer in source.submission.answers.items())
+    return source.text
+
+
+def latest_activity(checkins, assignments, notes, bridges):
+    moments = [check.recorded_at for check in checkins]
+    moments.extend(a.submission.submitted_at if a.submission else a.assigned_at for a in assignments)
+    moments.extend(moment for note in notes for moment in (note.created_at, note.shared_at, note.revoked_at) if moment)
+    moments.extend(bridge.updated_at or bridge.created_at for bridge in bridges)
+    return max(moments) if moments else None
 
 
 def distinct_revisit_points(report, displayed_insights):
@@ -134,23 +163,27 @@ def patient_summary(repo, patient, now=None):
     now = now or DemoClock().now
     checks, assignments, events = repo.checkins(patient.id), repo.assignments(patient.id), repo.events(patient.id)
     metrics, counts = recent_metrics(checks), homework_counts(assignments)
-    last = max([c.recorded_at for c in checks] + [a.assigned_at for a in assignments])
+    last = latest_activity(checks, assignments, therapist_notes(repo.notes(patient.id)), repo.bridges(patient.id))
     current = next((b for b in reversed(repo.bridges(patient.id)) if b.status != BridgeStatus.ARCHIVED), None)
     step = next((e for e in reversed(events) if e.kind == EventKind.STEP_FORWARD), None)
     setback = next((e for e in reversed(events) if e.kind == EventKind.SETBACK), None)
-    delta = None if metrics["previous_anxiety"] is None else metrics["anxiety"] - metrics["previous_anxiety"]
+    baseline_anxiety = sum(check.anxiety for check in checks[:5]) / len(checks[:5]) if checks else None
+    delta = None if baseline_anxiety is None else metrics["anxiety"] - baseline_anxiety
+    stress_delta = None if metrics["previous_stress"] is None else metrics["stress"] - metrics["previous_stress"]
     if step:
-        trend, label, highlight, tone = "Punteggi stabili, comportamento in evoluzione", "Passo avanti", step.text, "positive"
-    elif patient.name == "Martina Romano":
-        trend, label, highlight, tone = "Stress aumentato nelle ultime settimane", "Cambiamento recente", "Nuova nota condivisa", "attention"
-    elif patient.name == "Andrea Conti" and setback:
+        trend, label, highlight, tone = "Un passo avanti, anche con ansia presente", "Passo avanti", step.text, "positive"
+    elif setback and delta is not None and delta <= -.5 and stress_delta is not None and stress_delta >= .5:
         trend, label, highlight, tone = "Miglioramento iniziale, difficoltà recente", "Da riprendere", setback.text, "attention"
+    elif stress_delta is not None and stress_delta >= .8:
+        shared = therapist_notes(repo.notes(patient.id))
+        trend = "Stress aumentato nei check-in recenti"
+        label, highlight, tone = ("Contenuto condiviso", "Una nota condivisa da riprendere", "attention") if shared else ("Da riprendere", "Stress medio più alto rispetto ai cinque check-in precedenti", "attention")
     else:
-        trend = "Ansia più bassa rispetto all'inizio" if delta is not None and delta < 0 else "Andamento stabile"
+        trend = "Ansia più bassa rispetto all'inizio" if delta is not None and delta <= -.5 else "Andamento da osservare insieme"
         label, highlight, tone = ("Bridge", "Pronto per la seduta", "positive") if current and current.status == BridgeStatus.READY else ("Ultimo segnale", "Andamento da osservare", "")
     hw = f"{counts['completed']} di {counts['assigned']} completati"
     if counts["expired"]: hw += f" · {counts['expired']} scaduti"
-    return PatientSummary(patient.id, patient.name, patient.age, patient.scenario, relative_day(last, now), trend, hw, label, highlight, tone)
+    return PatientSummary(patient.id, patient.name, patient.age, patient.scenario, relative_day(last, now) if last else "Nessuna attività", trend, hw, label, highlight, tone)
 
 
 def patient_read_model(repo, patient_id, now=None):
@@ -163,4 +196,5 @@ def patient_read_model(repo, patient_id, now=None):
         "bridges": repo.bridges(patient_id), "metrics": recent_metrics(checks),
         "counts": homework_counts(assignments), "insights": narrative_insights(derive_progress(checks, events), checks, events),
         "report": build_report(patient_id, now - timedelta(days=21), now, checks, assignments, notes, events),
+        "last_activity": latest_activity(checks, assignments, therapist_notes(notes), repo.bridges(patient_id)),
     }

@@ -7,6 +7,7 @@ from uuid import UUID, uuid5
 from psyhelper.domain.models import *
 from .clock import DemoClock
 from .homework_catalog import homework_template
+from .homework_examples import homework_answers
 
 NS = UUID("bf853ec3-31ba-4bc2-9e3e-2c49dd2ec821")
 
@@ -148,17 +149,6 @@ GOALS = {
 }
 
 
-def _answers(template: HomeworkTemplate, episode: str, index: int) -> dict[str, str]:
-    phrases = [
-        f"Ho osservato: {episode}.",
-        "All'inizio mi aspettavo che sarebbe stato difficile.",
-        "Ho scelto un passo piccolo e verificabile.",
-        "Il disagio era presente, ma sono riuscito/a a restare nel compito.",
-        "Alla fine ho notato più margine di quanto prevedessi.",
-    ]
-    return {prompt: phrases[(index + offset) % len(phrases)] for offset, prompt in enumerate(template.prompts)}
-
-
 def build_scenario(slug, therapist_id, clock=DemoClock()):
     name, age, desc, anx, stress, assigned, completed, expired, current, archived = SPECS[slug]
     patient = Patient(did(slug, "patient", 0), therapist_id, name, age, clock.anchor - timedelta(days=60), desc)
@@ -180,13 +170,18 @@ def build_scenario(slug, therapist_id, clock=DemoClock()):
         submission = None
         if status == HomeworkStatus.COMPLETED:
             episode = HW_EPISODES[slug][i % len(HW_EPISODES[slug])]
-            submission = HomeworkSubmission(did(slug, "submission", i), did(slug, "homework", i), clock.days_ago(52 - i * 7), _answers(template, episode, i))
-        homework.append(HomeworkAssignment(did(slug, "homework", i), patient.id, template, at, clock.days_ago(49 - i * 7), status, submission))
+            submitted_at = clock.days_ago(52 - i * 7)
+            submission = HomeworkSubmission(did(slug, "submission", i), did(slug, "homework", i), submitted_at, homework_answers(template, slug, episode, i, submitted_at))
+        due_at = clock.days_ago(49 - i * 7)
+        if status == HomeworkStatus.PENDING:
+            at = clock.days_ago(2)
+            due_at = clock.now + timedelta(days=5)
+        homework.append(HomeworkAssignment(did(slug, "homework", i), patient.id, template, at, due_at, status, submission))
 
     active, achieved = GOALS[slug]
     goals = [
         JourneyGoal(did(slug, "goal", 0), patient.id, active, GoalKind.GOAL, GoalStatus.ACTIVE, clock.days_ago(58), clock.days_ago(5)),
-        JourneyGoal(did(slug, "goal", 1), patient.id, achieved, GoalKind.COMMITMENT, GoalStatus.ACHIEVED, clock.days_ago(55), clock.days_ago(18)),
+        JourneyGoal(did(slug, "goal", 1), patient.id, achieved, GoalKind.COMMITMENT, GoalStatus.ACHIEVED, clock.days_ago(55), clock.days_ago(5)),
     ]
     shared_text = {
         "giulia": "Vorrei riprendere la settimana della scadenza: ho controllato molto, ma ho comunque delegato una parte.",
@@ -196,11 +191,23 @@ def build_scenario(slug, therapist_id, clock=DemoClock()):
     }[slug]
     notes = [
         PatientNote(did(slug, "note", 0), patient.id, shared_text, clock.days_ago(7), clock.days_ago(6)),
-        PatientNote(did(slug, "note", 1), patient.id, f"Promemoria personale sul percorso di {name.split()[0].lower()}.", clock.days_ago(4)),
+        PatientNote(did(slug, "note", 1), patient.id, {
+            "giulia": "Mi pesa sentirmi in difetto anche quando nessuno mi ha criticata. Non sono ancora pronta a parlarne.",
+            "luca": "A volte temo che gli altri mi invitino solo per gentilezza. Per ora voglio tenerlo qui.",
+            "martina": "Faccio fatica a dire a casa quanto mi pesa questo esame. Vorrei prima trovare le parole.",
+            "andrea": "Mi sento in colpa quando mi riposo, anche se sono esausto. Non so ancora come raccontarlo.",
+        }[slug], clock.days_ago(4)),
     ]
     bridges = [SessionBridge(did(slug, "bridge", i), patient.id, clock.days_ago(45-i*16), BridgeStatus.ARCHIVED, [], "Temi discussi in seduta", clock.days_ago(43-i*16)) for i in range(archived)]
-    items = [] if current == BridgeStatus.DRAFT else [SessionBridgeItem(did(slug, "bridge-item", 0), "note", notes[0].id, "Nota condivisa recente", 10)]
-    bridges.append(SessionBridge(did(slug, "bridge", archived), patient.id, clock.days_ago(3), current, items, "Vorrei partire da qui." if items else ""))
+    items = []
+    if current != BridgeStatus.DRAFT:
+        latest_done = next(a for a in reversed(homework) if a.submission)
+        items = [
+            SessionBridgeItem(did(slug, "bridge-item", 0), "note", notes[0].id, "Una nota che ho scelto di condividere", 1),
+            SessionBridgeItem(did(slug, "bridge-item", 1), "checkin", checks[-1].id, f"Check-in: {checks[-1].trigger}", 0),
+            SessionBridgeItem(did(slug, "bridge-item", 2), "homework", latest_done.id, f"Attività: {latest_done.template.title}", 0),
+        ]
+    bridges.append(SessionBridge(did(slug, "bridge", archived), patient.id, clock.days_ago(3), current, items, "Vorrei partire da qui." if items else "", clock.days_ago(0, 10) if items else None))
 
     event_specs = [(EventKind.IMPROVEMENT, "Cambiamento nei comportamenti osservato nei check-in", checks[10].id)]
     if slug in ("giulia", "andrea"):
