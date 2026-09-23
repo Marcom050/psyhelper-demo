@@ -64,11 +64,11 @@ def build_bridge_candidates(
     assignments: list[HomeworkAssignment] | None = None,
 ) -> list[SessionBridgeItem]:
     """Build reference-only candidates. Private notes are deliberately filtered out."""
-    candidates = [_candidate("note", n.id, "Nota condivisa", 10) for n in notes if n.is_shared]
+    candidates = [_candidate("note", n.id, f"Nota condivisa · {n.shared_at:%d/%m}", 10) for n in notes if n.is_shared]
     candidates += [_candidate("progress_event", e.id, e.text, 7) for e in events]
     recent_checks = sorted(checkins or [], key=lambda c: c.recorded_at, reverse=True)[:4]
     candidates += [
-        _candidate("checkin", c.id, f"Check-in: {c.mood or c.trigger or 'aggiornamento recente'}", 8)
+        _candidate("checkin", c.id, f"Check-in del {c.recorded_at:%d/%m}: {c.trigger or c.mood or 'aggiornamento recente'}", 8)
         for c in recent_checks if c.trigger or c.mood or c.note_for_therapist
     ]
     completed = sorted(
@@ -140,7 +140,7 @@ def build_report(patient_id: str, start: datetime, end: datetime, checkins: list
     if expired:
         points.append(f"{len(expired)} homework recenti risultano scaduti e possono essere ripresi insieme.")
     shared = therapist_notes(notes)
-    points.extend(f"Nota condivisa: {n.text}" for n in shared if start <= n.created_at <= end)
+    points.extend(f"Nota condivisa: {n.text}" for n in shared if start <= n.shared_at <= end)
     recent_completed = sorted((a for a in completed if a.submission), key=lambda a: a.submission.submitted_at, reverse=True)[:3]
     answers = [{"homework": a.template.title, **a.submission.answers} for a in recent_completed]
     return PreSessionReport(

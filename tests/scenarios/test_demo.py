@@ -57,3 +57,21 @@ def test_martina_recent_expiry_and_report_points_match_scenario(tmp_path):
     report=build_report(patient.id,clock.now-timedelta(days=21),clock.now,repo.checkins(patient.id),repo.assignments(patient.id),repo.notes(patient.id),repo.events(patient.id))
     assert report.homework_expired==2 and report.previous_stress is not None and report.stress_change>0
     assert any("studio/esami" in point for point in report.points_to_revisit)
+
+
+def test_seed_dates_statuses_and_bridge_sources_are_consistent(tmp_path):
+    repo = seed_demo_database(tmp_path / "demo.db")
+    now = DemoClock().now
+    for patient in repo.patients():
+        for assignment in repo.assignments(patient.id):
+            assert assignment.assigned_at <= now
+            if assignment.status.value == "pending":
+                assert assignment.due_at > now and assignment.submission is None
+            elif assignment.status.value == "expired":
+                assert assignment.due_at < now and assignment.submission is None
+            else:
+                assert assignment.assigned_at <= assignment.submission.submitted_at <= assignment.due_at
+        current = next(item for item in repo.bridges(patient.id) if item.status.value != "archived")
+        if current.status.value == "ready":
+            assert sum(item.priority == 1 for item in current.items) == 1
+            assert {item.source_type for item in current.items} == {"note", "checkin", "homework"}

@@ -36,6 +36,10 @@ def switch_role(st, role: str):
         st.session_state.route = "oggi" if st.session_state.selected_patient_id else "dashboard"
 
 
+def role_changed(st):
+    switch_role(st, st.session_state.demo_role)
+
+
 def select_demo_patient(st, patient_id: str):
     st.session_state.selected_patient_id = patient_id
     st.session_state.route = "patient_today"

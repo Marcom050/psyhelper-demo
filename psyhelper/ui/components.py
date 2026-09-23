@@ -2,7 +2,7 @@ from html import escape
 
 import altair as alt
 
-from psyhelper.ui.presentation import italian_date, metric_delta_model, trend_dataset
+from psyhelper.ui.presentation import bridge_reference, italian_date, metric_delta_model, trend_dataset
 
 
 KIND_LABELS = {
@@ -21,10 +21,20 @@ def insight(st, label, text):
 
 def semantic_metric(st, label, value, current, previous):
     delta = metric_delta_model(current, previous)
+    display = "—" if value is None else str(value).replace(".", ",")
+    st.markdown(
+        f'<div class="ph-semantic-metric"><span>{escape(label)}</span>'
+        f'<strong>{escape(display)}</strong>'
+        f'<small class="ph-delta-{delta.tone}">{escape(delta.text)}</small></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def summary_metric(st, label, value, detail=""):
     st.markdown(
         f'<div class="ph-semantic-metric"><span>{escape(label)}</span>'
         f'<strong>{escape(str(value))}</strong>'
-        f'<small class="ph-delta-{delta.tone}">{escape(delta.text)}</small></div>',
+        f'<small class="ph-delta-neutral">{escape(detail)}</small></div>',
         unsafe_allow_html=True,
     )
 
@@ -53,3 +63,10 @@ def homework_answer(st, assignment):
     with st.expander("Vedi risposte"):
         for prompt, answer in assignment.submission.answers.items():
             st.markdown(f'<div class="ph-answer"><strong>{escape(prompt.replace("_", " ").capitalize())}</strong><br>{escape(answer)}</div>', unsafe_allow_html=True)
+
+
+def bridge_items(st, items, model):
+    for item in sorted(items, key=lambda entry: -entry.priority):
+        label = f"Da qui vorrei partire · {item.title}" if item.priority else item.title
+        with st.expander(label, expanded=bool(item.priority)):
+            st.write(bridge_reference(item, model))

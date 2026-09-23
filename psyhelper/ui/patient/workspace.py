@@ -1,12 +1,14 @@
 from __future__ import annotations
 
+from html import escape
+
 from psyhelper.demo.clock import DemoClock
 from psyhelper.domain.models import BridgeStatus, GoalKind, GoalStatus, HomeworkStatus
 from psyhelper.services.core import build_bridge_candidates
 from psyhelper.ui.actions import (complete_homework, create_patient_checkin, create_private_note,
                                   prepare_patient_bridge, set_note_sharing)
-from psyhelper.ui.components import trend_chart
-from psyhelper.ui.presentation import italian_date
+from psyhelper.ui.components import bridge_items, homework_answer, trend_chart
+from psyhelper.ui.presentation import italian_date, patient_read_model
 
 
 PROMPT_LABELS = {
@@ -79,14 +81,18 @@ def today(st, repo, patient):
 def checkin_form(st, repo, patient):
     st.title("Come stai oggi?")
     st.caption("Il check-in fa parte del percorso condiviso con il professionista.")
-    with st.form("patient-checkin"):
+    with st.form(f"patient-checkin-{patient.id}"):
         mood = st.text_input("Emozione principale", placeholder="Per esempio: teso, serena, stanco")
-        intensity = st.slider("Intensità", 0, 10, 5); anxiety = st.slider("Ansia", 0, 10, 5); stress = st.slider("Stress", 0, 10, 5)
-        add = st.checkbox("Vuoi aggiungere qualcosa?")
+        intensity = st.slider("Quanto è intensa questa emozione?", 0, 10, 5)
+        cols = st.columns(2)
+        anxiety = cols[0].slider("Ansia", 0, 10, 5)
+        stress = cols[1].slider("Stress", 0, 10, 5)
+        st.caption("0 = per nulla · 10 = al massimo")
         optional = {}
-        if add:
+        with st.expander("Aggiungi un dettaglio (facoltativo)"):
+            st.caption("Puoi compilare solo ciò che ti è utile ricordare. Questi dettagli sono condivisi con il professionista.")
             optional["trigger"] = st.text_area("Cosa è successo?", help="La situazione o il momento che vuoi ricordare.", height=80)
-            optional["automatic_thought"] = st.text_area("Pensiero automatico", help="Cosa ti è passato per la mente in quel momento?", height=80)
+            optional["automatic_thought"] = st.text_area("Cosa ti è passato per la mente?", help="Un pensiero arrivato in quel momento, anche in poche parole.", height=80)
             optional["behavior"] = st.text_area("Cosa hai fatto?", height=80)
             optional["body_sensations"] = st.text_input("Sensazioni corporee")
             optional["alternative_response"] = st.text_area("Risposta alternativa", height=80)
@@ -97,7 +103,8 @@ def checkin_form(st, repo, patient):
         clean["trigger"] = clean.get("trigger") or ""; clean["behavior"] = clean.get("behavior") or ""
         create_patient_checkin(repo, patient.id, DemoClock().now, anxiety=anxiety, stress=stress,
                                mood=mood.strip() or None, mood_intensity=intensity, **clean)
-        st.toast("Check-in salvato"); _go(st, "patient_today")
+        st.session_state.demo_notice = "Check-in salvato e disponibile nel percorso condiviso."
+        _go(st, "patient_today")
     if st.button("Torna a Oggi"): _go(st, "patient_today")
 
 
@@ -113,10 +120,15 @@ def activities(st, repo, patient):
         if st.button("Inizia", key=f"start-{assignment.id}"): _go(st, "patient_homework", active_homework_id=assignment.id)
         st.divider()
     st.subheader("Completate")
-    for assignment in [a for a in assignments if a.status != HomeworkStatus.PENDING]:
-        label = "Completata" if assignment.status == HomeworkStatus.COMPLETED else "Non completata"
-        date = assignment.submission.submitted_at if assignment.submission else assignment.due_at
-        st.markdown(f"**{assignment.template.title}** · {label} · {italian_date(date)}")
+    for assignment in [a for a in assignments if a.status == HomeworkStatus.COMPLETED]:
+        st.markdown(f"**{assignment.template.title}** · Completata · {italian_date(assignment.submission.submitted_at)}")
+        homework_answer(st, assignment)
+    expired = [a for a in assignments if a.status == HomeworkStatus.EXPIRED]
+    if expired:
+        with st.expander(f"Attività da riprendere · {len(expired)}"):
+            st.caption("Puoi parlarne con il professionista e concordare come proseguire.")
+            for assignment in expired:
+                st.markdown(f"**{assignment.template.title}** · Scaduta il {italian_date(assignment.due_at)}")
 
 
 def homework_form(st, repo, patient):
@@ -125,14 +137,16 @@ def homework_form(st, repo, patient):
     if not assignment or assignment.status != HomeworkStatus.PENDING:
         st.warning("Questa attività non è disponibile."); return
     st.title(assignment.template.title); st.write(f"{len(assignment.template.prompts)} domande per raccogliere la tua esperienza.")
-    with st.form("complete-homework"):
+    with st.form(f"complete-homework-{assignment.id}"):
         answers = {prompt: st.text_area(PROMPT_LABELS.get(prompt, prompt.replace("_", " ").capitalize()), height=90)
                    for prompt in assignment.template.prompts}
         submitted = st.form_submit_button("Salva attività", type="primary")
     if submitted:
         try: complete_homework(repo, assignment, answers, DemoClock().now)
         except ValueError: st.error("Completa tutte le risposte prima di salvare.")
-        else: st.toast("Attività completata"); _go(st, "patient_activities")
+        else:
+            st.session_state.demo_notice = "Attività completata. Le risposte sono disponibili al professionista."
+            _go(st, "patient_activities")
     if st.button("Torna alle attività"): _go(st, "patient_activities")
 
 
@@ -142,7 +156,7 @@ def journey(st, repo, patient):
     for goal in goals:
         kind = "Obiettivo" if goal.kind == GoalKind.GOAL else "Passo concordato"
         status = "In corso" if goal.status == GoalStatus.ACTIVE else "Completato"
-        st.markdown(f'<div class="ph-note"><span class="ph-eyebrow">{kind}</span><br><strong>{goal.title}</strong><br><span class="ph-meta">{status}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ph-note"><span class="ph-eyebrow">{kind}</span><br><strong>{escape(goal.title)}</strong><br><span class="ph-meta">{status}</span></div>', unsafe_allow_html=True)
     st.subheader("Andamento")
     checks = repo.checkins(patient.id)
     trend_chart(st, checks[-12:], compact=True, patient_id=patient.id, view="patient-journey")
@@ -169,19 +183,33 @@ def journey(st, repo, patient):
 def private_area(st, repo, patient):
     st.title("Area privata")
     st.write("Uno spazio per appuntare ciò che vuoi tenere per te o decidere di portare in seduta.")
-    with st.form("private-note"):
+    st.caption("Le note restano in questa area finché scegli di condividerle. Non entrano automaticamente nei riepiloghi.")
+    with st.form(f"private-note-{patient.id}", clear_on_submit=True):
         text = st.text_area("Scrivi qualcosa per te", height=130)
         saved = st.form_submit_button("Salva nota", type="primary")
-    if saved and text.strip(): create_private_note(repo, patient.id, text, DemoClock().now); st.toast("Visibile solo a te"); st.rerun()
+    if saved:
+        if text.strip():
+            create_private_note(repo, patient.id, text, DemoClock().now)
+            st.session_state.demo_notice = "Nota salvata nell'area privata: non è condivisa con il professionista."
+            st.rerun()
+        else:
+            st.error("Scrivi qualcosa prima di salvare la nota.")
     for note in sorted(repo.notes(patient.id), key=lambda n: n.created_at, reverse=True):
-        st.markdown(f'<div class="ph-note">{note.text}<br><span class="ph-meta">{italian_date(note.created_at, year=True)} · {"Condivisa" if note.is_shared else "Solo per me"}</span></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="ph-note">{escape(note.text).replace(chr(10), "<br>")}<br><span class="ph-meta">{italian_date(note.created_at, year=True)} · {"Condivisa" if note.is_shared else "Solo per me"}</span></div>', unsafe_allow_html=True)
         if note.is_shared:
             if st.button("Revoca condivisione", key=f"revoke-{note.id}"):
-                set_note_sharing(repo, note, False, DemoClock().now); st.info("Non sarà più mostrata nelle viste future del professionista. Potrebbe essere già stata vista."); st.rerun()
+                set_note_sharing(repo, note, False, DemoClock().now)
+                st.session_state.demo_notice = "Condivisione revocata: la nota non compare più nelle viste del professionista. Potrebbe essere già stata letta."
+                st.rerun()
         elif st.session_state.get("confirm_share_note") == note.id:
             st.info("Questa nota sarà visibile al professionista nelle sezioni dedicate alla preparazione della seduta.")
             if st.button("Condividi", key=f"confirm-{note.id}"):
-                set_note_sharing(repo, note, True, DemoClock().now); st.session_state.pop("confirm_share_note", None); st.rerun()
+                set_note_sharing(repo, note, True, DemoClock().now)
+                st.session_state.pop("confirm_share_note", None)
+                st.session_state.demo_notice = "Nota condivisa per la prossima seduta."
+                st.rerun()
+            if st.button("Tieni privata", key=f"cancel-share-{note.id}"):
+                st.session_state.pop("confirm_share_note", None); st.rerun()
         elif st.button("Condividi per la prossima seduta", key=f"share-{note.id}"):
             st.session_state.confirm_share_note = note.id; st.rerun()
 
@@ -191,23 +219,33 @@ def bridge(st, repo, patient):
     bridges = repo.bridges(patient.id); current = next((b for b in reversed(bridges) if b.status != BridgeStatus.ARCHIVED), None)
     if current and current.status in (BridgeStatus.READY, BridgeStatus.REVIEWED):
         st.subheader("Bridge pronto" if current.status == BridgeStatus.READY else "Ripreso in seduta")
-        for item in sorted(current.items, key=lambda item: -item.priority): st.markdown(f"- **{item.title}**{' · Da qui vorrei partire' if item.priority else ''}")
+        bridge_items(st, current.items, patient_read_model(repo, patient.id))
         if current.optional_text: st.write(current.optional_text)
         st.caption("Il professionista potrà vederlo nella preparazione della prossima seduta.")
     else:
         candidates = build_bridge_candidates(repo.notes(patient.id), repo.events(patient.id), checkins=repo.checkins(patient.id), assignments=repo.assignments(patient.id))
         st.subheader("Scegli fino a 4 cose che vorresti riprendere")
         selected = []
+        draft_key = f"{patient.id}-{current.id if current else 'new'}"
         for item in candidates:
-            if st.checkbox(item.title, key=f"candidate-{item.id}"): selected.append(item)
+            if st.checkbox(item.title, key=f"candidate-{draft_key}-{item.id}"): selected.append(item)
         if len(selected) > 4: st.warning("Puoi scegliere al massimo 4 elementi.")
         labels = {item.id: item.title for item in selected}
-        priority = st.radio("Da dove vuoi partire?", list(labels), format_func=lambda item_id: labels[item_id]) if selected else None
-        optional = st.text_area("Vuoi aggiungere qualcosa?", height=100)
+        priority = st.radio("Da dove vuoi partire?", list(labels), format_func=lambda item_id: labels[item_id], key=f"priority-{draft_key}") if selected else None
+        optional = st.text_area("Vuoi aggiungere qualcosa?", height=100, key=f"bridge-text-{draft_key}")
         if st.button("Prepara Bridge", type="primary", disabled=not selected or len(selected) > 4):
-            prepare_patient_bridge(repo, patient.id, candidates, [item.id for item in selected], priority, optional, DemoClock().now); st.rerun()
+            prepare_patient_bridge(repo, patient.id, candidates, [item.id for item in selected], priority, optional, DemoClock().now)
+            st.session_state.demo_notice = "Bridge pronto: il professionista lo ritrova nella preparazione della seduta."
+            st.rerun()
         st.caption("Qui compaiono check-in, attività, momenti del percorso e soltanto le note che hai scelto di condividere.")
     archived = [b for b in reversed(bridges) if b.status == BridgeStatus.ARCHIVED]
     if archived:
         st.subheader("Sedute precedenti")
-        for old in archived: st.markdown(f"**{italian_date(old.created_at, year=True)}** · {len(old.items)} elementi · Archiviato")
+        for old in archived:
+            with st.expander(f"{italian_date(old.created_at, year=True)} · Archiviato"):
+                if old.optional_text:
+                    st.write(old.optional_text)
+                for item in sorted(old.items, key=lambda entry: -entry.priority):
+                    st.write(f"{'Priorità · ' if item.priority else ''}{item.title}")
+                if not old.items:
+                    st.caption("Questa seduta dello scenario non contiene elementi dettagliati.")

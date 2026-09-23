@@ -127,3 +127,12 @@ def test_bridge_is_available_with_significant_pre_session_context(tmp_path):
     assert current.status == BridgeStatus.READY
     assert current.items
     assert 3 <= len(significant_events(model["events"], model["checkins"])) <= 5
+
+
+def test_quantitative_insights_are_not_replaced_by_a_single_episode(tmp_path):
+    repo = seed_demo_database(tmp_path / "demo.db")
+    model = patient_read_model(repo, did("giulia", "patient", 0))
+    improvement = next(item for item in model["insights"] if item.kind == "improvement")
+    recurring = next(item for item in model["insights"] if item.kind == "recurring_trigger")
+    assert "medi sono più bassi" in improvement.text and len(improvement.source_ids) >= 6
+    assert "riunione di reparto" in recurring.text and "6 check-in" in recurring.text
