@@ -5,7 +5,6 @@ from psyhelper.ui.presentation import patient_summary
 
 def render(st, repo, on_open):
     st.caption("Area professionista · Demo")
-    st.title("Buongiorno, Elena")
     st.markdown('<p class="ph-lead">Una vista essenziale su ciò che è cambiato tra una seduta e l’altra.</p>', unsafe_allow_html=True)
     st.write("")
     st.subheader("4 percorsi attivi")
