@@ -119,10 +119,12 @@ def activities(st, repo, patient):
         st.markdown(f"**{assignment.template.title}**  \nUn'attività guidata in {len(assignment.template.prompts)} brevi passaggi.  \nScadenza {italian_date(assignment.due_at)}")
         if st.button("Inizia", key=f"start-{assignment.id}"): _go(st, "patient_homework", active_homework_id=assignment.id)
         st.divider()
-    st.subheader("Completate")
-    for assignment in [a for a in assignments if a.status == HomeworkStatus.COMPLETED]:
-        st.markdown(f"**{assignment.template.title}** · Completata · {italian_date(assignment.submission.submitted_at)}")
-        homework_answer(st, assignment)
+    completed = [a for a in assignments if a.status == HomeworkStatus.COMPLETED]
+    with st.expander(f"Attività completate · {len(completed)}", expanded=False):
+        if not completed: st.write("Non ci sono ancora attività completate.")
+        for assignment in completed:
+            st.markdown(f"**{assignment.template.title}** · Completata · {italian_date(assignment.submission.submitted_at)}")
+            homework_answer(st, assignment)
     expired = [a for a in assignments if a.status == HomeworkStatus.EXPIRED]
     if expired:
         with st.expander(f"Attività da riprendere · {len(expired)}"):
@@ -169,15 +171,16 @@ def journey(st, repo, patient):
     for text in observations.get(patient.name.split()[0], []): st.markdown(f"- {text}")
     st.subheader("Momenti del percorso")
     for event in reversed(repo.events(patient.id)): st.markdown(f"**{italian_date(event.occurred_at)}**  \n{event.text}")
-    st.subheader("I tuoi check-in")
-    for check in reversed(checks[-8:]):
-        title = f"{italian_date(check.recorded_at)} · Ansia {check.anxiety} · Stress {check.stress}"
-        with st.expander(title):
-            fields = (("Emozione", check.mood), ("Cosa è successo", check.trigger), ("Pensiero", check.automatic_thought),
-                      ("Cosa hai fatto", check.behavior), ("Sensazioni corporee", check.body_sensations),
-                      ("Risposta alternativa", check.alternative_response), ("Nota per il professionista", check.note_for_therapist))
-            for label, value in fields:
-                if value: st.markdown(f"**{label}**  \n{value}")
+    with st.expander("Storico dei check-in", expanded=False):
+        if not checks: st.write("Non ci sono ancora check-in registrati.")
+        for check in reversed(checks[-8:]):
+            title = f"{italian_date(check.recorded_at)} · Ansia {check.anxiety} · Stress {check.stress}"
+            with st.expander(title):
+                fields = (("Emozione", check.mood), ("Cosa è successo", check.trigger), ("Pensiero", check.automatic_thought),
+                          ("Cosa hai fatto", check.behavior), ("Sensazioni corporee", check.body_sensations),
+                          ("Risposta alternativa", check.alternative_response), ("Nota per il professionista", check.note_for_therapist))
+                for label, value in fields:
+                    if value: st.markdown(f"**{label}**  \n{value}")
 
 
 def private_area(st, repo, patient):
